@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Inbox Zero is Actually Possible.</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Pixelify+Sans:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+  :root{
+    /* 1 unit = 1% of the 1993px reference width, locked above that */
+    --k: min(1vw, 19.93px);
+
+    --bg:        #141414;
+    --grid:      rgba(255,255,255,.030);
+
+    --mono-a:    #9a9a9a;
+    --mono-b:    #8c8c8c;
+  }
+
+  html,body{height:100%}
+
+  body{
+    background: var(--bg);
+    font-family:'Space Grotesk',system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    -moz-osx-font-smoothing:grayscale;
+    min-height:100dvh;
+    display:grid;
+    place-items:center;
+    overflow-x:hidden;
+  }
+
+  /* ── background: column grid + soft centre glow ───────────────── */
+  .bg{
+    position:fixed; inset:0; z-index:0; pointer-events:none;
+  }
+  .bg::before{
+    content:''; position:absolute; inset:0;
+    background-image:linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size:6.25% 100%;
+    -webkit-mask-image:linear-gradient(180deg,rgba(0,0,0,.55) 0%,rgba(0,0,0,1) 22%,rgba(0,0,0,1) 72%,rgba(0,0,0,.35) 100%);
+            mask-image:linear-gradient(180deg,rgba(0,0,0,.55) 0%,rgba(0,0,0,1) 22%,rgba(0,0,0,1) 72%,rgba(0,0,0,.35) 100%);
+  }
+  .bg::after{
+    content:''; position:absolute; inset:0;
+    background:radial-gradient(58% 42% at 50% 34%, rgba(255,255,255,.045) 0%, rgba(255,255,255,0) 70%);
+  }
+
+  /* ── stage ────────────────────────────────────────────────────── */
+  .stage{
+    position:relative; z-index:1;
+    width:100%;
+    display:flex; flex-direction:column; align-items:center;
+    padding: calc(var(--k) * 5.5) 0 calc(var(--k) * 3.5);
+  }
+
+  /* ── headline ─────────────────────────────────────────────────── */
+  h1{
+    font-weight:500;
+    font-size: calc(var(--k) * 7.2);
+    line-height:1.05;
+    letter-spacing:-0.005em;
+    text-align:center;
+    text-wrap:balance;
+  }
+  h1 .line{
+    display:block;
+    /* chrome gradient, clipped to the glyphs of this line */
+    background:linear-gradient(180deg,
+      #fbfbfb  0%,
+      #ffffff  6%,
+      #d2d2d2 19%,
+      #979797 33%,
+      #6e6e6e 44%,
+      #fdfdfd 52%,
+      #e2e2e2 59%,
+      #949494 70%,
+      #787878 79%,
+      #c6c6c6 90%,
+      #6e6e6e 100%);
+    -webkit-background-clip:text;
+            background-clip:text;
+    color:transparent;
+    filter:
+      drop-shadow(0 calc(var(--k) * .07) 0 rgba(0,0,0,.55))
+      drop-shadow(0 calc(var(--k) * .6) calc(var(--k) * 1.6) rgba(0,0,0,.5));
+  }
+  /* the glitched, bitmap-set characters */
+  h1 .px{
+    font-family:'Pixelify Sans','Space Grotesk',sans-serif;
+    font-weight:600;
+    font-size:1.045em;
+    letter-spacing:-0.012em;
+  }
+
+  /* ── envelope ─────────────────────────────────────────────────── */
+  .envelope{
+    width: calc(var(--k) * 27.75);
+    height:auto;
+    display:block;
+    margin-top: calc(var(--k) * 3.1);
+    filter:drop-shadow(0 calc(var(--k) * 1.2) calc(var(--k) * 2.2) rgba(0,0,0,.65));
+  }
+
+  /* ── waitlist bar ─────────────────────────────────────────────── */
+  .bar{
+    position:relative;
+    width: calc(var(--k) * 47.4);
+    max-width:calc(100% - var(--k) * 6);
+    height: calc(var(--k) * 6.87);
+    margin-top: calc(var(--k) * -4.1);
+    display:flex; align-items:center;
+    padding-left:  calc(var(--k) * 2.5);
+    padding-right: calc(var(--k) * 3.6);
+    border:1px solid rgba(255,255,255,.22);
+    border-radius: calc(var(--k) * .22);
+    background:linear-gradient(180deg,#191919 0%,#131313 55%,#0d0d0d 100%);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,.05),
+      0 calc(var(--k) * 3) calc(var(--k) * 6) calc(var(--k) * -1) rgba(0,0,0,.9),
+      0 calc(var(--k) * .8) calc(var(--k) * 2.2) rgba(0,0,0,.75);
+  }
+  .bar::after{ /* soft pooled shadow under the bar */
+    content:''; position:absolute; left:4%; right:4%;
+    bottom: calc(var(--k) * -2.2); height: calc(var(--k) * 4);
+    background:radial-gradient(50% 100% at 50% 0%, rgba(0,0,0,.85), rgba(0,0,0,0) 72%);
+    z-index:-1; pointer-events:none;
+  }
+
+  .bar input,
+  .bar button{
+    font-family:'Space Mono',ui-monospace,monospace;
+    font-size: calc(var(--k) * 1.5);
+    letter-spacing:.1em;
+    background:none; border:0; outline:none; padding:0;
+  }
+  .bar input{
+    flex:1 1 auto; min-width:0;
+    color:#e6e6e6;
+    caret-color:#cfcfcf;
+  }
+  .bar input::placeholder{ color:var(--mono-a); opacity:1 }
+  .bar button{
+    flex:0 0 auto;
+    color:var(--mono-b);
+    cursor:pointer;
+    white-space:nowrap;
+    transition:color .22s ease;
+  }
+  .bar button:hover,
+  .bar button:focus-visible{ color:#e8e8e8 }
+
+  .bar.is-done{ justify-content:center; padding-inline:calc(var(--k) * 2.5) }
+  .bar.is-done .done{
+    font-family:'Space Mono',ui-monospace,monospace;
+    font-size: calc(var(--k) * 1.5);
+    letter-spacing:.1em;
+    color:var(--mono-a);
+  }
+
+  /* ── small screens: same design, scaled up to fill the phone ──── */
+  @media (max-width: 820px){
+    :root{ --k: 1.62vw }
+  }
+  @media (max-width: 560px){
+    :root{ --k: 1.95vw }
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    *{transition:none !important; animation:none !important}
+  }
+</style>
+</head>
+<body>
+
+<div class="bg" aria-hidden="true"></div>
+
+<main class="stage">
+
+  <h1>
+    <span class="line"><span>Inb</span><span class="px">o</span><span>x&nbsp;Z</span><span class="px">e</span><span class="px">r</span><span>o</span></span>
+    <span class="line"><span>is&nbsp;</span><span class="px">A</span><span>ctu</span><span class="px">a</span><span>lly</span></span>
+    <span class="line"><span>Po</span><span class="px">ss</span><span>i</span><span>bl</span><span class="px">e</span><span class="px">.</span></span>
+  </h1>
+
+  <svg class="envelope" viewBox="0 0 553 355" role="img" aria-label="Envelope with a zero badge">
+    <defs>
+      <linearGradient id="body" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0"    stop-color="#cfcfcf"/>
+        <stop offset=".30"  stop-color="#b3b3b3"/>
+        <stop offset=".62"  stop-color="#929292"/>
+        <stop offset="1"    stop-color="#6a6a6a"/>
+      </linearGradient>
+      <radialGradient id="wedge" cx=".22" cy=".78" r=".7">
+        <stop offset="0"   stop-color="rgba(255,255,255,.16)"/>
+        <stop offset="1"   stop-color="rgba(255,255,255,0)"/>
+      </radialGradient>
+      <linearGradient id="flap" x1=".08" y1="0" x2=".92" y2=".95">
+        <stop offset="0"    stop-color="#c2c2c2"/>
+        <stop offset=".42"  stop-color="#a0a0a0"/>
+        <stop offset="1"    stop-color="#7d7d7d"/>
+      </linearGradient>
+      <linearGradient id="edge" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0"   stop-color="rgba(255,255,255,.55)"/>
+        <stop offset=".5"  stop-color="rgba(255,255,255,.10)"/>
+        <stop offset="1"   stop-color="rgba(0,0,0,.45)"/>
+      </linearGradient>
+      <radialGradient id="badgeShadow" cx=".5" cy=".5" r=".5">
+        <stop offset=".72" stop-color="rgba(0,0,0,.30)"/>
+        <stop offset="1"   stop-color="rgba(0,0,0,0)"/>
+      </radialGradient>
+      <radialGradient id="badgeFill" cx=".35" cy=".28" r=".95">
+        <stop offset="0"   stop-color="#1c1c1c"/>
+        <stop offset=".55" stop-color="#0e0e0e"/>
+        <stop offset="1"   stop-color="#070707"/>
+      </radialGradient>
+      <linearGradient id="badgeRing" x1="0" y1="0" x2=".4" y2="1">
+        <stop offset="0"   stop-color="#b4b4b4"/>
+        <stop offset=".45" stop-color="#5c5c5c"/>
+        <stop offset=".7"  stop-color="#8e8e8e"/>
+        <stop offset="1"   stop-color="#3a3a3a"/>
+      </linearGradient>
+      <linearGradient id="zeroChrome" x1="0" y1="0" x2=".25" y2="1">
+        <stop offset="0"   stop-color="#ffffff"/>
+        <stop offset=".38" stop-color="#a9a9a9"/>
+        <stop offset=".55" stop-color="#f2f2f2"/>
+        <stop offset="1"   stop-color="#767676"/>
+      </linearGradient>
+      <clipPath id="shell">
+        <rect x="0" y="0" width="553" height="355" rx="16" ry="16"/>
+      </clipPath>
+    </defs>
+
+    <!-- body -->
+    <rect x="0" y="0" width="553" height="355" rx="16" ry="16" fill="url(#body)"/>
+
+    <g clip-path="url(#shell)">
+      <rect x="0" y="0" width="553" height="355" fill="url(#wedge)"/>
+      <!-- flap -->
+      <path d="M0 0 L276.5 222 L553 0 Z" fill="url(#flap)"/>
+      <!-- fold shadow, then the bright crease on top of it -->
+      <path d="M0 5 L276.5 227 L553 5" fill="none" stroke="rgba(0,0,0,.28)" stroke-width="6" stroke-linejoin="round"/>
+      <path d="M0 0 L276.5 222 L553 0"  fill="none" stroke="rgba(255,255,255,.42)" stroke-width="2.4" stroke-linejoin="round"/>
+      <!-- inner top highlight -->
+      <path d="M2 1.5 H551" fill="none" stroke="rgba(255,255,255,.34)" stroke-width="3"/>
+    </g>
+
+    <!-- outer edge -->
+    <rect x=".9" y=".9" width="551.2" height="353.2" rx="15.2" ry="15.2" fill="none" stroke="url(#edge)" stroke-width="1.8"/>
+
+    <!-- badge -->
+    <circle cx="404" cy="113" r="92" fill="url(#badgeShadow)"/>
+    <circle cx="404" cy="113" r="73" fill="url(#badgeFill)" stroke="url(#badgeRing)" stroke-width="3"/>
+    <circle cx="404" cy="113" r="65" fill="none" stroke="rgba(0,0,0,.5)" stroke-width="3"/>
+    <path d="M404 44 A69 69 0 0 0 348 72" fill="none" stroke="rgba(255,255,255,.18)" stroke-width="2"/>
+    <ellipse cx="404" cy="113" rx="22" ry="33" fill="none" stroke="url(#zeroChrome)" stroke-width="9"/>
+    <circle cx="404" cy="113" r="7" fill="url(#zeroChrome)"/>
+  </svg>
+
+  <form class="bar" id="bar" novalidate>
+    <input id="email" type="email" name="email" placeholder="Enter your email" autocomplete="email" required aria-label="Enter your email">
+    <button type="submit">Join waitlist</button>
+  </form>
+
+</main>
+
+<script>
+  const bar = document.getElementById('bar');
+  const email = document.getElementById('email');
+
+  bar.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const v = email.value.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v)) {
+      email.focus();
+      bar.animate(
+        [{transform:'translateX(0)'},{transform:'translateX(-6px)'},{transform:'translateX(6px)'},{transform:'translateX(0)'}],
+        {duration:260, easing:'ease-in-out'}
+      );
+      return;
+    }
+    bar.classList.add('is-done');
+    bar.innerHTML = '<span class="done">You’re on the list.</span>';
+  });
+</script>
+
+</body>
+</html>
