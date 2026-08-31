@@ -16,10 +16,14 @@
     --k: min(1vw, 19.93px);
 
     --bg:        #141414;
-    --grid:      rgba(255,255,255,.030);
+    --grid:      rgba(255,255,255,.034);
+    /* the page ground spelled out as channels, so the erase-gradient below can
+       fade it to zero alpha without either engine routing through black */
+    --bg-rgb:    20,20,20;
 
     --mono-a:    #9a9a9a;
     --mono-b:    #8c8c8c;
+    --mono-hi:   #dcdcdc;
   }
 
   html,body{height:100%}
@@ -35,20 +39,35 @@
     overflow-x:hidden;
   }
 
-  /* ── background: column grid + soft centre glow ───────────────── */
+  /* ── background: column grid, erased where the composition lives ─── */
   .bg{
     position:fixed; inset:0; z-index:0; pointer-events:none;
   }
+  /* The columns now run the full height. In the reference they are exactly as
+     strong at the very top and the very bottom as in the middle of the margin,
+     so the old top/bottom mask is gone. */
   .bg::before{
     content:''; position:absolute; inset:0;
     background-image:linear-gradient(90deg, var(--grid) 1px, transparent 1px);
     background-size:6.25% 100%;
-    -webkit-mask-image:linear-gradient(180deg,rgba(0,0,0,.55) 0%,rgba(0,0,0,1) 22%,rgba(0,0,0,1) 72%,rgba(0,0,0,.35) 100%);
-            mask-image:linear-gradient(180deg,rgba(0,0,0,.55) 0%,rgba(0,0,0,1) 22%,rgba(0,0,0,1) 72%,rgba(0,0,0,.35) 100%);
   }
+  /* Painted OVER the grid, in the page's own colour, so it punches a soft hole:
+     no column ever crosses the headline, the envelope or the bar, and the
+     columns get stronger as they walk out to the margins. Done with an opaque
+     overlay rather than mask-composite because the composite keywords still
+     differ between Chrome and Safari. The white layer on top is a whisper of
+     key light, high and centred, sitting behind the type. */
   .bg::after{
     content:''; position:absolute; inset:0;
-    background:radial-gradient(58% 42% at 50% 34%, rgba(255,255,255,.045) 0%, rgba(255,255,255,0) 70%);
+    background:
+      radial-gradient(46% 30% at 50% 33%,
+        rgba(255,255,255,.020) 0%,
+        rgba(255,255,255,0)   72%),
+      radial-gradient(30% 46% at 50% 55%,
+        rgba(var(--bg-rgb),1)    0%,
+        rgba(var(--bg-rgb),1)   62%,
+        rgba(var(--bg-rgb),.62) 80%,
+        rgba(var(--bg-rgb),0)  100%);
   }
 
   /* ── stage ────────────────────────────────────────────────────── */
@@ -56,40 +75,116 @@
     position:relative; z-index:1;
     width:100%;
     display:flex; flex-direction:column; align-items:center;
-    padding: calc(var(--k) * 5.5) 0 calc(var(--k) * 3.5);
+    padding: calc(var(--k) * 6.8) 0 calc(var(--k) * 2.2);
   }
 
   /* ── headline ─────────────────────────────────────────────────── */
+  /*
+     CHROME MATERIAL — two stacked background layers, blended, then clipped to
+     the glyphs. Layer 1 (top) is the per-glyph vertical BEVEL. Layer 2 (bottom)
+     is the per-line horizontal SHEEN. They are combined with `hard-light`,
+     whose branch is chosen by the SOURCE (= the bevel, the top layer):
+        bevel > 0.5  ->  screen(bevel, sheen)   highlights survive any column
+        bevel <= 0.5 ->  multiply(bevel, sheen) shadows deepen in dark columns
+     That is what the reference does: the x-height rim reads 243-255 even in the
+     darkest column, while the mid-tones swing 110 -> 195 across the line.
+
+     Putting the BEVEL on top is also the safety net: if a browser drops
+     background-blend-mode under background-clip:text, the opaque top layer
+     simply wins and the headline degrades to a correct vertical chrome.
+
+     Vertical mapping. Space Grotesk at line-height 1.05 puts the baseline at
+     0.8725em and the cap top at 0.1725em from the top of the line box. The line
+     gets 0.12em of block padding (cancelled by an equal negative margin, so the
+     layout is untouched) purely to give the background box room for the "y"
+     descender and for the drop shadow. Inside that 1.29em-tall box:
+        cap top   0.2925em -> 22.67 %
+        x-height  0.5000em -> 38.76 %   (rim peak placed a hair above, 38.1 %)
+        baseline  0.9925em -> 76.94 %
+     so the ramp carries TWO bright rims - one for tall letters, one at the
+     x-line for s/c/u/a/y/o - and a hard fall to the dark bottom edge.
+  */
   h1{
     font-weight:500;
     font-size: calc(var(--k) * 7.2);
     line-height:1.05;
     letter-spacing:-0.005em;
     text-align:center;
-    text-wrap:balance;
+
+    /* flex, so the negative block margins on the lines cannot collapse and the
+       lines shrink-wrap the text (the sheen must span the GLYPHS, not the page) */
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+
+    --bevel:linear-gradient(180deg,
+      #fafafa   0%,      /* holds above the cap line: i-dots, pixel-font caps */
+      #f2f2f2  22.67%,   /* cap top — tall-letter rim */
+      #fafafa  25.11%,
+      #c8c8c8  27.29%,
+      #a4a4a4  30.81%,
+      #888888  34.07%,   /* shelf: the dip that lets the x-rim read as an edge */
+      #999999  35.42%,
+      #f6f6f6  38.14%,   /* x-height rim — the brightest band in the line */
+      #d2d2d2  40.31%,
+      #b4b4b4  44.38%,
+      #9c9c9c  49.81%,
+      #919191  55.23%,
+      #9e9e9e  59.57%,   /* satin bounce lobe */
+      #8e8e8e  63.91%,
+      #7c7c7c  69.34%,
+      #5a5a5a  73.14%,
+      #3a3a3a  76.11%,
+      #2e2e2e  76.94%,   /* baseline — dark bottom edge */
+      #303030  80.19%,
+      #2c2c2c  93.21%,   /* descender of the "y" */
+      #2c2c2c 100%);
+
+    /* neutral default so background-image can never fail to resolve */
+    --sheen:linear-gradient(90deg,#808080 0%,#808080 100%);
   }
+
   h1 .line{
     display:block;
-    /* chrome gradient, clipped to the glyphs of this line */
-    background:linear-gradient(180deg,
-      #fbfbfb  0%,
-      #ffffff  6%,
-      #d2d2d2 19%,
-      #979797 33%,
-      #6e6e6e 44%,
-      #fdfdfd 52%,
-      #e2e2e2 59%,
-      #949494 70%,
-      #787878 79%,
-      #c6c6c6 90%,
-      #6e6e6e 100%);
+    /* Layer model, measured not eyeballed:
+         layer 1 = per-glyph bevel, authored around 128-grey, blended hard-light
+         layer 2 = per-line horizontal sheen, carries the absolute luminance
+       Space Grotesk @ line-height 1.05 -> cap top = 17.0% of the line box,
+       x-height top = 34.2%, baseline = 83.7%. The bright stops at 17% AND 34.2%
+       are what give tall glyphs AND x-height glyphs each their own top rim —
+       a single line-spanning gradient cannot do that. */
+    --bevel:linear-gradient(180deg,
+      #b9b9b9  0%,
+      #b9b9b9 17.0%,
+      #dfdfdf 19.7%,
+      #898989 25.0%,
+      #797979 32.6%,
+      #dfdfdf 34.2%,
+      #a6a6a6 39.0%,
+      #797979 49.0%,
+      #6c6c6c 58.4%,
+      #898989 66.4%,
+      #737373 75.7%,
+      #4f4f4f 83.7%,
+      #4f4f4f 100%);
+    background-blend-mode:hard-light, normal;
     -webkit-background-clip:text;
             background-clip:text;
     color:transparent;
     filter:
-      drop-shadow(0 calc(var(--k) * .07) 0 rgba(0,0,0,.55))
-      drop-shadow(0 calc(var(--k) * .6) calc(var(--k) * 1.6) rgba(0,0,0,.5));
+      drop-shadow(0 calc(var(--k) * .06) 0 rgba(0,0,0,.60))
+      drop-shadow(0 calc(var(--k) * .42) calc(var(--k) * .95) rgba(0,0,0,.42));
   }
+  h1 .l1{ background-image:var(--bevel),
+    linear-gradient(90deg,#5a5a5a 0%,#626262 8%,#8a8a8a 20%,#b5b5b5 32%,#d5d5d5 44%,
+                          #a2a2a2 54%,#bbbbbb 64%,#727272 76%,#4a4a4a 88%,#363636 100%); }
+  h1 .l2{ background-image:var(--bevel),
+    linear-gradient(90deg,#d6d6d6 0%,#c2c2c2 10%,#939393 24%,#656565 38%,#505050 50%,
+                          #3a3a3a 60%,#353535 68%,#505050 78%,#868686 88%,#bababa 100%); }
+  h1 .l3{ background-image:var(--bevel),
+    linear-gradient(90deg,#080808 0%,#0e0e0e 10%,#2e2e2e 24%,#525252 36%,#7d7d7d 48%,
+                          #939393 58%,#b1b1b1 68%,#c6c6c6 78%,#bdbdbd 88%,#8d8d8d 100%); }
+
   /* the glitched, bitmap-set characters */
   h1 .px{
     font-family:'Pixelify Sans','Space Grotesk',sans-serif;
@@ -107,8 +202,19 @@
     filter:drop-shadow(0 calc(var(--k) * 1.2) calc(var(--k) * 2.2) rgba(0,0,0,.65));
   }
 
-  /* ── waitlist bar ─────────────────────────────────────────────── */
+  /* ── waitlist bar ──────────────────────────── */
+  /* Machined dark glass. The ring is ONE radial gradient painted on the
+     border-box with its focus above the bar: hottest along the top edge,
+     falling away toward the corners (measured on the reference: mid-edge ~255,
+     corners ~50) and keeping a residual rim along the bottom. The fill is
+     painted on the padding-box and covers everything except that 1px ring. */
   .bar{
+    --ring-hi:  .44;
+    --ring-mid: .31;
+    --ring-lo:  .205;
+    --ring-min: .165;
+    --halo:     .016;
+
     position:relative;
     width: calc(var(--k) * 47.4);
     max-width:calc(100% - var(--k) * 6);
@@ -117,51 +223,137 @@
     display:flex; align-items:center;
     padding-left:  calc(var(--k) * 2.5);
     padding-right: calc(var(--k) * 3.6);
-    border:1px solid rgba(255,255,255,.22);
-    border-radius: calc(var(--k) * .22);
-    background:linear-gradient(180deg,#191919 0%,#131313 55%,#0d0d0d 100%);
+
+    border:1px solid transparent;
+    border-radius: calc(var(--k) * .38);
+
+    background:
+      /* key light spilling in over the upper-left shoulder */
+      radial-gradient(84% 210% at 16% -34%,
+        rgba(255,255,255,.055) 0%,
+        rgba(255,255,255,0)   64%) padding-box,
+      /* dark glass — barely lifted under the top edge, deeper at the floor */
+      linear-gradient(180deg, #1c1c1d 0%, #171718 36%, #151516 64%, #0f0f10 100%) padding-box,
+      /* the ring */
+      radial-gradient(128% 440% at 47% -18%,
+        rgba(255,255,255,var(--ring-hi))  0%,
+        rgba(255,255,255,var(--ring-mid)) 27%,
+        rgba(255,255,255,var(--ring-lo))  58%,
+        rgba(255,255,255,var(--ring-min)) 100%) border-box;
+
     box-shadow:
-      inset 0 1px 0 rgba(255,255,255,.05),
-      0 calc(var(--k) * 3) calc(var(--k) * 6) calc(var(--k) * -1) rgba(0,0,0,.9),
-      0 calc(var(--k) * .8) calc(var(--k) * 2.2) rgba(0,0,0,.75);
+      /* top bevel, then the bloom it throws down the inside face */
+      inset 0 1px 0 rgba(255,255,255,.075),
+      inset 0 calc(var(--k) * .42) calc(var(--k) * .80) calc(var(--k) * -.42) rgba(255,255,255,.05),
+      /* the bounce coming back off the floor of the well */
+      inset 0 -1px 0 rgba(255,255,255,.032),
+      inset 0 calc(var(--k) * -.72) calc(var(--k) * 1.10) calc(var(--k) * -.78) rgba(255,255,255,.05),
+      /* weight underneath — pure black only, so it deepens #141414 instead of
+         laying a grey haze over it */
+      0 calc(var(--k) * 1.2) calc(var(--k) * 2.0) calc(var(--k) * -.50) rgba(0,0,0,.85),
+      0 calc(var(--k) * 2.8) calc(var(--k) * 4.4) calc(var(--k) * -1.4) rgba(0,0,0,.72),
+      /* last in the stack, so the blacks above paint on top of it: the faint
+         halo the lit ring spills back onto the page */
+      0 0 calc(var(--k) * 2.6) rgba(255,255,255,var(--halo));
   }
-  .bar::after{ /* soft pooled shadow under the bar */
-    content:''; position:absolute; left:4%; right:4%;
-    bottom: calc(var(--k) * -2.2); height: calc(var(--k) * 4);
-    background:radial-gradient(50% 100% at 50% 0%, rgba(0,0,0,.85), rgba(0,0,0,0) 72%);
-    z-index:-1; pointer-events:none;
+  /* The pool. It starts exactly at the bar's bottom edge (top:100%) so it never
+     overlaps the bar — which is what lets .is-shake put a transform on .bar
+     without the pool jumping in front of the bar's own background. */
+  .bar::after{
+    content:''; position:absolute; pointer-events:none;
+    left: calc(var(--k) * .9); right: calc(var(--k) * .9);
+    top:100%; height: calc(var(--k) * 3.4);
+    background:linear-gradient(180deg,
+      rgba(0,0,0,.62)  0%,
+      rgba(0,0,0,.42) 30%,
+      rgba(0,0,0,.18) 62%,
+      rgba(0,0,0,0)  100%);
+    -webkit-mask-image:linear-gradient(90deg, rgba(0,0,0,0) 0%, #000 8%, #000 92%, rgba(0,0,0,0) 100%);
+            mask-image:linear-gradient(90deg, rgba(0,0,0,0) 0%, #000 8%, #000 92%, rgba(0,0,0,0) 100%);
   }
 
-  .bar input,
-  .bar button{
+  .bar:focus-within{
+    --ring-hi:  .62;
+    --ring-mid: .38;
+    --ring-lo:  .185;
+    --ring-min: .09;
+    --halo:     .030;
+  }
+
+  /* — typography and spacing: unchanged from before — */
+  .bar-field,
+  .bar-cta,
+  .bar-msg{
     font-family:'Space Mono',ui-monospace,monospace;
     font-size: calc(var(--k) * 1.5);
     letter-spacing:.1em;
-    background:none; border:0; outline:none; padding:0;
   }
-  .bar input{
+  .bar-field,
+  .bar-cta{
+    background:none; border:0; outline:none; padding:0;
+    transition:opacity .26s ease, color .22s ease;
+  }
+  .bar-field{
     flex:1 1 auto; min-width:0;
     color:#e6e6e6;
     caret-color:#cfcfcf;
   }
-  .bar input::placeholder{ color:var(--mono-a); opacity:1 }
-  .bar button{
+  .bar-field::placeholder{ color:var(--mono-a); opacity:1 }
+  .bar-cta{
     flex:0 0 auto;
     color:var(--mono-b);
     cursor:pointer;
     white-space:nowrap;
-    transition:color .22s ease;
   }
-  .bar button:hover,
-  .bar button:focus-visible{ color:#e8e8e8 }
+  .bar-cta:hover,
+  .bar-cta:focus-visible{ color:#e8e8e8 }
+  .bar-cta:disabled{ cursor:default; color:var(--mono-b) }
 
-  .bar.is-done{ justify-content:center; padding-inline:calc(var(--k) * 2.5) }
-  .bar.is-done .done{
-    font-family:'Space Mono',ui-monospace,monospace;
-    font-size: calc(var(--k) * 1.5);
-    letter-spacing:.1em;
-    color:var(--mono-a);
+  /* FormSubmit honeypot — out of flow, out of the tab order, never seen. */
+  .bar-honey{
+    position:absolute; width:1px; height:1px;
+    padding:0; margin:-1px; border:0;
+    overflow:hidden; clip-path:inset(50%); white-space:nowrap;
   }
+
+  /* Every state message lives on this overlay: absolutely positioned across the
+     bar's box, same mono, same left padding as the placeholder. Nothing inside
+     the bar ever reflows. */
+  .bar-msg{
+    position:absolute; inset:0;
+    display:flex; align-items:center; justify-content:flex-start;
+    padding-left:  calc(var(--k) * 2.5);
+    padding-right: calc(var(--k) * 3.6);
+    color:var(--mono-a);
+    white-space:nowrap; overflow:hidden;
+    opacity:0; visibility:hidden;
+    transition:opacity .26s ease, color .26s ease, visibility 0s linear .26s;
+  }
+  .bar.is-msg .bar-msg{
+    opacity:1; visibility:visible;
+    transition:opacity .26s ease, color .26s ease;
+  }
+  .bar.is-msg .bar-field,
+  .bar.is-msg .bar-cta{ opacity:0; pointer-events:none }
+
+  /* success: the message centres and the ring comes up a stop */
+  .bar.is-ok .bar-msg{ justify-content:center; color:var(--mono-hi) }
+  .bar.is-ok{
+    --ring-hi:  .56;
+    --ring-mid: .34;
+    --ring-lo:  .16;
+    --ring-min: .08;
+    --halo:     .026;
+  }
+
+  /* invalid address — the same shake, now scaled like everything else */
+  @keyframes barShake{
+    0%,100%{ transform:translateX(0) }
+    22%    { transform:translateX(calc(var(--k) * -.32)) }
+    55%    { transform:translateX(calc(var(--k) *  .32)) }
+    78%    { transform:translateX(calc(var(--k) * -.16)) }
+  }
+  .bar.is-shake{ animation:barShake .26s ease-in-out }
 
   /* ── small screens: same design, scaled up to fill the phone ──── */
   @media (max-width: 820px){
@@ -183,110 +375,517 @@
 <main class="stage">
 
   <h1>
-    <span class="line"><span>Inb</span><span class="px">o</span><span>x&nbsp;Z</span><span class="px">e</span><span class="px">r</span><span>o</span></span>
-    <span class="line"><span>is&nbsp;</span><span class="px">A</span><span>ctu</span><span class="px">a</span><span>lly</span></span>
-    <span class="line"><span>Po</span><span class="px">ss</span><span>i</span><span>bl</span><span class="px">e</span><span class="px">.</span></span>
+    <span class="line l1"><span>Inb</span><span class="px">o</span><span>x&nbsp;Z</span><span class="px">e</span><span class="px">r</span><span>o</span></span>
+    <span class="line l2"><span>is&nbsp;</span><span class="px">A</span><span>ctu</span><span class="px">a</span><span>lly</span></span>
+    <span class="line l3"><span>Po</span><span class="px">ss</span><span>i</span><span>bl</span><span class="px">e</span><span class="px">.</span></span>
   </h1>
 
   <svg class="envelope" viewBox="0 0 553 355" role="img" aria-label="Envelope with a zero badge">
     <defs>
-      <linearGradient id="body" x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0"    stop-color="#cfcfcf"/>
-        <stop offset=".30"  stop-color="#b3b3b3"/>
-        <stop offset=".62"  stop-color="#929292"/>
-        <stop offset="1"    stop-color="#6a6a6a"/>
+      <!-- ══ ENVELOPE MATERIAL ═══════════════════════════════════════════
+           Not eyeballed. The reference's brightness RIDGE is a straight band
+           running from (70% w, 2% h) to (2% w, 67% h) — about 155° in image
+           space. The gradient axis is its perpendicular, unit (0.429, 0.906),
+           so across this viewBox the vector is (240, 506). The stops below are
+           the measured luminances of the reference projected onto that axis:
+             t=0%  L81   t=9%  L104  t=16% L125  t=30% L165 (the ridge)
+             t=45% L120  t=64% L68   t=81% L63   t=100% extrapolated
+           Satin metal: one continuous field across every face, with the folds
+           reading as EDGES (glint + cast shadow), not as tonal jumps. -->
+      <linearGradient id="envBody" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="240" y2="506">
+        <stop offset="0"   stop-color="#4e4e4e"/>
+        <stop offset=".06" stop-color="#5c5c5c"/>
+        <stop offset=".14" stop-color="#767676"/>
+        <stop offset=".21" stop-color="#8c8c8c"/>
+        <stop offset=".26" stop-color="#9b9b9b"/>
+        <stop offset=".30" stop-color="#a5a5a5"/>
+        <stop offset=".33" stop-color="#9d9d9d"/>
+        <stop offset=".36" stop-color="#8a8a8a"/>
+        <stop offset=".40" stop-color="#7c7c7c"/>
+        <stop offset=".45" stop-color="#707070"/>
+        <stop offset=".51" stop-color="#666666"/>
+        <stop offset=".55" stop-color="#555555"/>
+        <stop offset=".60" stop-color="#3f3f3f"/>
+        <stop offset=".68" stop-color="#323232"/>
+        <stop offset=".76" stop-color="#242424"/>
+        <stop offset=".88" stop-color="#202020"/>
+        <stop offset="1"   stop-color="#1c1c1c"/>
       </linearGradient>
-      <radialGradient id="wedge" cx=".22" cy=".78" r=".7">
-        <stop offset="0"   stop-color="rgba(255,255,255,.16)"/>
-        <stop offset="1"   stop-color="rgba(255,255,255,0)"/>
-      </radialGradient>
-      <linearGradient id="flap" x1=".08" y1="0" x2=".92" y2=".95">
-        <stop offset="0"    stop-color="#c2c2c2"/>
-        <stop offset=".42"  stop-color="#a0a0a0"/>
-        <stop offset="1"    stop-color="#7d7d7d"/>
+
+      <!-- the flap sits a hair proud of the body, the panel right of the V a
+           hair back — just enough to separate the faces without banding -->
+      <linearGradient id="envFlapLift" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="240" y2="506">
+        <stop offset="0"   stop-color="#ffffff" stop-opacity=".040"/>
+        <stop offset=".55" stop-color="#ffffff" stop-opacity=".018"/>
+        <stop offset="1"   stop-color="#ffffff" stop-opacity="0"/>
       </linearGradient>
-      <linearGradient id="edge" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0"   stop-color="rgba(255,255,255,.55)"/>
-        <stop offset=".5"  stop-color="rgba(255,255,255,.10)"/>
-        <stop offset="1"   stop-color="rgba(0,0,0,.45)"/>
+
+      <!-- fold glint: bright where the surface is bright (top of each fold),
+           fading to nothing at the V — a uniform stroke is the amateur tell -->
+      <linearGradient id="envGlintL" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="270" y2="224">
+        <stop offset="0"   stop-color="#ffffff" stop-opacity=".10"/>
+        <stop offset=".45" stop-color="#ffffff" stop-opacity=".34"/>
+        <stop offset="1"   stop-color="#ffffff" stop-opacity=".12"/>
       </linearGradient>
-      <radialGradient id="badgeShadow" cx=".5" cy=".5" r=".5">
-        <stop offset=".72" stop-color="rgba(0,0,0,.30)"/>
-        <stop offset="1"   stop-color="rgba(0,0,0,0)"/>
-      </radialGradient>
-      <radialGradient id="badgeFill" cx=".35" cy=".28" r=".95">
-        <stop offset="0"   stop-color="#1c1c1c"/>
-        <stop offset=".55" stop-color="#0e0e0e"/>
+      <linearGradient id="envGlintR" gradientUnits="userSpaceOnUse" x1="553" y1="0" x2="270" y2="224">
+        <stop offset="0"   stop-color="#ffffff" stop-opacity=".30"/>
+        <stop offset=".55" stop-color="#ffffff" stop-opacity=".16"/>
+        <stop offset="1"   stop-color="#ffffff" stop-opacity=".07"/>
+      </linearGradient>
+      <linearGradient id="envGlintSeam" gradientUnits="userSpaceOnUse" x1="0" y1="355" x2="270" y2="150">
+        <stop offset="0"   stop-color="#ffffff" stop-opacity=".05"/>
+        <stop offset="1"   stop-color="#ffffff" stop-opacity=".20"/>
+      </linearGradient>
+
+      <!-- top rim: measured as a 1-2 row spike (fill 164 -> 197), not a smear -->
+      <linearGradient id="envTopRim" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="553" y2="0">
+        <stop offset="0"   stop-color="#ffffff" stop-opacity=".10"/>
+        <stop offset=".55" stop-color="#ffffff" stop-opacity=".42"/>
+        <stop offset="1"   stop-color="#ffffff" stop-opacity=".22"/>
+      </linearGradient>
+      <linearGradient id="envEdge" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="355">
+        <stop offset="0"   stop-color="#ffffff" stop-opacity=".30"/>
+        <stop offset=".45" stop-color="#ffffff" stop-opacity=".05"/>
+        <stop offset="1"   stop-color="#000000" stop-opacity=".40"/>
+      </linearGradient>
+
+      <filter id="envSoft" x="-40%" y="-40%" width="180%" height="180%"
+              color-interpolation-filters="sRGB" primitiveUnits="userSpaceOnUse">
+        <feGaussianBlur stdDeviation="5"/>
+      </filter>
+      <filter id="envSoftTight" x="-40%" y="-40%" width="180%" height="180%"
+              color-interpolation-filters="sRGB" primitiveUnits="userSpaceOnUse">
+        <feGaussianBlur stdDeviation="1.8"/>
+      </filter>
+
+      <!-- ══ BADGE MATERIAL ══════════════════════════════════════════════════
+           Light: key from upper-left / upper-centre, weak rim from lower-right.
+           All gradients are userSpaceOnUse (viewBox units) — most portable form,
+           and immune to Safari's objectBoundingBox-on-stroke quirks.
+           All filters declare color-interpolation-filters="sRGB": without it
+           Chrome and Safari blur in linearRGB and the aura renders visibly
+           milkier / larger in one than the other. -->
+
+      <!-- blur kit. stdDeviation is in viewBox units (primitiveUnits defaults
+           to userSpaceOnUse), so every glow scales with the page. -->
+      <filter id="izBlurEdge" x="-150%" y="-150%" width="400%" height="400%"
+              color-interpolation-filters="sRGB" primitiveUnits="userSpaceOnUse">
+        <feGaussianBlur stdDeviation=".6"/>
+      </filter>
+      <filter id="izBlurTight" x="-150%" y="-150%" width="400%" height="400%"
+              color-interpolation-filters="sRGB" primitiveUnits="userSpaceOnUse">
+        <feGaussianBlur stdDeviation="2.6"/>
+      </filter>
+      <filter id="izBlurWide" x="-150%" y="-150%" width="400%" height="400%"
+              color-interpolation-filters="sRGB" primitiveUnits="userSpaceOnUse">
+        <feGaussianBlur stdDeviation="11"/>
+      </filter>
+      <filter id="izBlurEscape" x="-200%" y="-200%" width="500%" height="500%"
+              color-interpolation-filters="sRGB" primitiveUnits="userSpaceOnUse">
+        <feGaussianBlur stdDeviation="24"/>
+      </filter>
+      <filter id="izBlurSoft" x="-150%" y="-150%" width="400%" height="400%"
+              color-interpolation-filters="sRGB" primitiveUnits="userSpaceOnUse">
+        <feGaussianBlur stdDeviation="6"/>
+      </filter>
+      <filter id="izBlurMid" x="-150%" y="-150%" width="400%" height="400%"
+              color-interpolation-filters="sRGB" primitiveUnits="userSpaceOnUse">
+        <feGaussianBlur stdDeviation="6"/>
+      </filter>
+      <filter id="izBlurContact" x="-80%" y="-80%" width="260%" height="260%"
+              color-interpolation-filters="sRGB" primitiveUnits="userSpaceOnUse">
+        <feGaussianBlur stdDeviation="7"/>
+      </filter>
+      <filter id="izBlurContactTight" x="-80%" y="-80%" width="260%" height="260%"
+              color-interpolation-filters="sRGB" primitiveUnits="userSpaceOnUse">
+        <feGaussianBlur stdDeviation="2.6"/>
+      </filter>
+
+      <!-- outer bezel: near-black, glossy, lit down-right -->
+      <linearGradient id="izBezel" gradientUnits="userSpaceOnUse" x1="351" y1="60" x2="457" y2="166">
+        <stop offset="0"   stop-color="#1b1b1b"/>
+        <stop offset=".38" stop-color="#0d0d0d"/>
+        <stop offset=".72" stop-color="#060606"/>
+        <stop offset="1"   stop-color="#020202"/>
+      </linearGradient>
+      <!-- bezel gloss, inner shoulder, top-left → fades out both ends -->
+      <linearGradient id="izGlossTL" gradientUnits="userSpaceOnUse" x1="341.65" y1="83.92" x2="466.35" y2="83.92">
+        <stop offset="0"   stop-color="#ffffff" stop-opacity="0"/>
+        <stop offset=".28" stop-color="#ffffff" stop-opacity=".26"/>
+        <stop offset=".52" stop-color="#ffffff" stop-opacity=".20"/>
+        <stop offset="1"   stop-color="#ffffff" stop-opacity="0"/>
+      </linearGradient>
+      <!-- bezel rim-light, outer shoulder, lower-right (the weak second light) -->
+      <linearGradient id="izGlossBR" gradientUnits="userSpaceOnUse" x1="473.16" y1="138.17" x2="334.84" y2="138.17">
+        <stop offset="0"   stop-color="#ffffff" stop-opacity="0"/>
+        <stop offset=".14" stop-color="#ffffff" stop-opacity=".30"/>
+        <stop offset=".46" stop-color="#ffffff" stop-opacity=".17"/>
+        <stop offset="1"   stop-color="#ffffff" stop-opacity="0"/>
+      </linearGradient>
+
+      <!-- face: soft diagonal sheen, never flat black -->
+      <linearGradient id="izFace" gradientUnits="userSpaceOnUse" x1="358" y1="67" x2="450" y2="159">
+        <stop offset="0"   stop-color="#1e1e1e"/>
+        <stop offset=".34" stop-color="#161616"/>
+        <stop offset=".70" stop-color="#0c0c0c"/>
         <stop offset="1"   stop-color="#070707"/>
-      </radialGradient>
-      <linearGradient id="badgeRing" x1="0" y1="0" x2=".4" y2="1">
-        <stop offset="0"   stop-color="#b4b4b4"/>
-        <stop offset=".45" stop-color="#5c5c5c"/>
-        <stop offset=".7"  stop-color="#8e8e8e"/>
-        <stop offset="1"   stop-color="#3a3a3a"/>
       </linearGradient>
-      <linearGradient id="zeroChrome" x1="0" y1="0" x2=".25" y2="1">
+      <!-- broad low-lying sheen band across the face (measured: +12/255 lift) -->
+      <linearGradient id="izSheen" gradientUnits="userSpaceOnUse" x1="338" y1="113" x2="470" y2="113">
+        <stop offset="0"   stop-color="#ffffff" stop-opacity="0"/>
+        <stop offset=".5"  stop-color="#ffffff" stop-opacity=".055"/>
+        <stop offset="1"   stop-color="#ffffff" stop-opacity="0"/>
+      </linearGradient>
+
+      <!-- inner rim. A true conic/angular gradient does not exist in SVG (and a
+           CSS conic-gradient cannot paint an SVG stroke in Safari), so the
+           around-the-circumference fade is built from a linear gradient laid on
+           the 140°→320° axis of the ring — a circle stroked with a linear ramp
+           reads as an angular fade, bright upper-left, dark lower-right — plus
+           one short overlaid arc for the lower-right second light. Portable to
+           every engine, no masks, no blend modes. -->
+      <linearGradient id="izRim" gradientUnits="userSpaceOnUse" x1="353.9" y1="70.96" x2="454.1" y2="155.04">
         <stop offset="0"   stop-color="#ffffff"/>
-        <stop offset=".38" stop-color="#a9a9a9"/>
-        <stop offset=".55" stop-color="#f2f2f2"/>
-        <stop offset="1"   stop-color="#767676"/>
+        <stop offset=".18" stop-color="#e9e9e9"/>
+        <stop offset=".42" stop-color="#9b9b9b"/>
+        <stop offset=".68" stop-color="#4a4a4a"/>
+        <stop offset="1"   stop-color="#1a1a1a"/>
       </linearGradient>
+      <linearGradient id="izRimBR" gradientUnits="userSpaceOnUse" x1="468.41" y1="124.36" x2="426.37" y2="174.46">
+        <stop offset="0"   stop-color="#dfe6ea" stop-opacity="0"/>
+        <stop offset=".45" stop-color="#f2f5f7" stop-opacity=".78"/>
+        <stop offset="1"   stop-color="#dfe6ea" stop-opacity="0"/>
+      </linearGradient>
+
+      <!-- the "0": body, then the two bevel edges, then the lower-right spec -->
+      <linearGradient id="izChrome" gradientUnits="userSpaceOnUse" x1="386" y1="76" x2="424" y2="152">
+        <stop offset="0"   stop-color="#fbfbfb"/>
+        <stop offset=".16" stop-color="#e4e4e4"/>
+        <stop offset=".40" stop-color="#b2b2b2"/>
+        <stop offset=".58" stop-color="#8d8d8d"/>
+        <stop offset=".78" stop-color="#adadad"/>
+        <stop offset="1"   stop-color="#6e6e6e"/>
+      </linearGradient>
+      <linearGradient id="izBevelOut" gradientUnits="userSpaceOnUse" x1="404" y1="75.5" x2="404" y2="150.5">
+        <stop offset="0"   stop-color="#ffffff"/>
+        <stop offset=".30" stop-color="#f2f2f2"/>
+        <stop offset=".62" stop-color="#b6b6b6"/>
+        <stop offset=".85" stop-color="#8d8d8d"/>
+        <stop offset="1"   stop-color="#c6c6c6"/>
+      </linearGradient>
+      <linearGradient id="izBevelIn" gradientUnits="userSpaceOnUse" x1="377.5" y1="88" x2="430.5" y2="140">
+        <stop offset="0"   stop-color="#ffffff"/>
+        <stop offset=".30" stop-color="#e0e0e0"/>
+        <stop offset=".65" stop-color="#9a9a9a"/>
+        <stop offset="1"   stop-color="#6d6d6d"/>
+      </linearGradient>
+      <linearGradient id="izSpecBR" gradientUnits="userSpaceOnUse" x1="428.9" y1="125.83" x2="412.19" y2="148.66">
+        <stop offset="0"   stop-color="#ffffff" stop-opacity="0"/>
+        <stop offset=".5"  stop-color="#ffffff" stop-opacity=".92"/>
+        <stop offset="1"   stop-color="#ffffff" stop-opacity="0"/>
+      </linearGradient>
+
+      <!-- aura tint: cool white, dimmer at the bottom so the glow obeys the key
+           light instead of reading as a flat blurred duplicate -->
+      <linearGradient id="izGlow" gradientUnits="userSpaceOnUse" x1="404" y1="70" x2="404" y2="156">
+        <stop offset="0"   stop-color="#ffffff"/>
+        <stop offset=".35" stop-color="#eef4f8"/>
+        <stop offset=".72" stop-color="#bccbd5"/>
+        <stop offset="1"   stop-color="#7d8f9b"/>
+      </linearGradient>
+
+      <radialGradient id="izDot" gradientUnits="userSpaceOnUse" cx="404" cy="113" r="6.4">
+        <stop offset="0"   stop-color="#f4f4f4" stop-opacity=".92"/>
+        <stop offset=".34" stop-color="#d4d4d4" stop-opacity=".78"/>
+        <stop offset=".66" stop-color="#8f8f8f" stop-opacity=".40"/>
+        <stop offset="1"   stop-color="#8f8f8f" stop-opacity="0"/>
+      </radialGradient>
+
+      <clipPath id="izFaceClip">
+        <circle cx="404" cy="113" r="64.4"/>
+      </clipPath>
+      <clipPath id="izZeroClip">
+        <path clip-rule="evenodd" fill-rule="evenodd"
+              d="M377.5 113A26.5 37.5 0 1 0 430.5 113A26.5 37.5 0 1 0 377.5 113ZM386.5 113A17.5 28.5 0 1 0 421.5 113A17.5 28.5 0 1 0 386.5 113Z"/>
+      </clipPath>
       <clipPath id="shell">
         <rect x="0" y="0" width="553" height="355" rx="16" ry="16"/>
       </clipPath>
     </defs>
 
-    <!-- body -->
-    <rect x="0" y="0" width="553" height="355" rx="16" ry="16" fill="url(#body)"/>
+    <!-- ══ ENVELOPE ═══════════════════════════════════════════════════════
+         V point (270,224), tip ROUNDED via the quadratic. Two further seams run
+         from the bottom corners up to 78% along each flap edge — the back-panel
+         creases the reference has and the first build was missing entirely. -->
+    <rect x="0" y="0" width="553" height="355" rx="16" ry="16" fill="url(#envBody)"/>
 
     <g clip-path="url(#shell)">
-      <rect x="0" y="0" width="553" height="355" fill="url(#wedge)"/>
-      <!-- flap -->
-      <path d="M0 0 L276.5 222 L553 0 Z" fill="url(#flap)"/>
-      <!-- fold shadow, then the bright crease on top of it -->
-      <path d="M0 5 L276.5 227 L553 5" fill="none" stroke="rgba(0,0,0,.28)" stroke-width="6" stroke-linejoin="round"/>
-      <path d="M0 0 L276.5 222 L553 0"  fill="none" stroke="rgba(255,255,255,.42)" stroke-width="2.4" stroke-linejoin="round"/>
-      <!-- inner top highlight -->
-      <path d="M2 1.5 H551" fill="none" stroke="rgba(255,255,255,.34)" stroke-width="3"/>
+      <!-- back-panel seams: cast shadow first, then the glint on top of it -->
+      <path d="M0 355 L210.6 174.7" fill="none" stroke="#000" stroke-opacity=".30"
+            stroke-width="5" filter="url(#envSoftTight)" transform="translate(3.5,2)"/>
+      <path d="M553 355 L332.3 174.7" fill="none" stroke="#000" stroke-opacity=".34"
+            stroke-width="5" filter="url(#envSoftTight)" transform="translate(-3.5,2)"/>
+      <path d="M0 355 L210.6 174.7" fill="none" stroke="url(#envGlintSeam)" stroke-width="1.6"/>
+      <path d="M553 355 L332.3 174.7" fill="none" stroke="url(#envGlintSeam)" stroke-width="1.6"/>
+
+      <!-- the flap casts a soft shadow onto the body below both lower edges,
+           stronger on the right where the key light is already falling away -->
+      <path d="M0 0 L255 211.6 Q270 231 285 212.1 L553 0" fill="none" stroke="#000"
+            stroke-opacity=".38" stroke-width="11" stroke-linejoin="round"
+            filter="url(#envSoft)" transform="translate(0,9)"/>
+
+      <!-- flap face -->
+      <path d="M0 0 L255 211.6 Q270 231 285 212.1 L553 0 Z" fill="url(#envFlapLift)"/>
+
+      <!-- fold glints, drawn per side so each can fade independently -->
+      <path d="M0 0 L255 211.6 Q270 231 285 212.1" fill="none" stroke="url(#envGlintL)"
+            stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
+      <path d="M553 0 L285 212.1 Q270 231 255 211.6" fill="none" stroke="url(#envGlintR)"
+            stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
+
+      <!-- top rim: sharp, 2 units, brightest centre-right -->
+      <path d="M0 0.9 H553" fill="none" stroke="url(#envTopRim)" stroke-width="1.5"/>
     </g>
 
     <!-- outer edge -->
-    <rect x=".9" y=".9" width="551.2" height="353.2" rx="15.2" ry="15.2" fill="none" stroke="url(#edge)" stroke-width="1.8"/>
+    <rect x=".9" y=".9" width="551.2" height="353.2" rx="15.2" ry="15.2"
+          fill="none" stroke="url(#envEdge)" stroke-width="1.6"/>
 
-    <!-- badge -->
-    <circle cx="404" cy="113" r="92" fill="url(#badgeShadow)"/>
-    <circle cx="404" cy="113" r="73" fill="url(#badgeFill)" stroke="url(#badgeRing)" stroke-width="3"/>
-    <circle cx="404" cy="113" r="65" fill="none" stroke="rgba(0,0,0,.5)" stroke-width="3"/>
-    <path d="M404 44 A69 69 0 0 0 348 72" fill="none" stroke="rgba(255,255,255,.18)" stroke-width="2"/>
-    <ellipse cx="404" cy="113" rx="22" ry="33" fill="none" stroke="url(#zeroChrome)" stroke-width="9"/>
-    <circle cx="404" cy="113" r="7" fill="url(#zeroChrome)"/>
+    <!-- ══ BADGE ═══════════════════════════════════════════════════════════
+         Centre (404,113). Outer bezel edge r=74.5, bezel 66.5→74.5,
+         bright inner rim 64.4→66.4, face r=64.4, "0" = the old rx22/ry33
+         stroke-width-9 ellipse rebuilt as an even-odd ring so it can carry a
+         real bevel: outer 26.5×37.5, inner 17.5×28.5. Geometry unchanged. -->
+    <g class="badge">
+
+      <!-- contact shadow onto the envelope, biased down and slightly left -->
+      <circle cx="401.5" cy="119" r="74.5" fill="#000000" opacity=".55" filter="url(#izBlurContact)"/>
+      <circle cx="402.5" cy="115.5" r="74.5" fill="#000000" opacity=".45" filter="url(#izBlurContactTight)"/>
+
+      <!-- outer bezel: near-black gloss, not a uniform stroke -->
+      <circle cx="404" cy="113" r="74.5" fill="url(#izBezel)"/>
+      <!-- bright thin arc, inner shoulder, top-left -->
+      <path d="M341.65 83.92A68.8 68.8 0 0 1 466.35 83.92" fill="none"
+            stroke="url(#izGlossTL)" stroke-width="2.8" stroke-linecap="round"/>
+      <!-- fainter arc, outer shoulder, bottom-right -->
+      <path d="M473.16 138.17A73.6 73.6 0 0 0 334.84 138.17" fill="none"
+            stroke="url(#izGlossBR)" stroke-width="1.7" stroke-linecap="round"/>
+
+      <!-- face -->
+      <circle cx="404" cy="113" r="64.4" fill="url(#izFace)"/>
+      <g clip-path="url(#izFaceClip)">
+        <ellipse cx="404" cy="113" rx="66" ry="21" transform="rotate(-40 404 113)"
+                 fill="url(#izSheen)" filter="url(#izBlurSoft)"/>
+      </g>
+
+      <!-- ══ AURA ══ the "0" glowing into the black face.
+           Three stacked blurred copies of the ring, all filled with the same
+           top-lit gradient so the light keeps the key direction, all clipped to
+           the face; the bright inner rim drawn afterwards hides the clip edge.
+           A fourth, much wider copy escapes past the bezel at the very end. -->
+      <g clip-path="url(#izFaceClip)">
+        <path fill-rule="evenodd" fill="url(#izGlow)" opacity=".76" filter="url(#izBlurWide)"
+              d="M377.5 113A26.5 37.5 0 1 0 430.5 113A26.5 37.5 0 1 0 377.5 113ZM386.5 113A17.5 28.5 0 1 0 421.5 113A17.5 28.5 0 1 0 386.5 113Z"/>
+        <path fill-rule="evenodd" fill="url(#izGlow)" opacity=".56" filter="url(#izBlurMid)"
+              d="M377.5 113A26.5 37.5 0 1 0 430.5 113A26.5 37.5 0 1 0 377.5 113ZM386.5 113A17.5 28.5 0 1 0 421.5 113A17.5 28.5 0 1 0 386.5 113Z"/>
+        <path fill-rule="evenodd" fill="url(#izGlow)" opacity=".74" filter="url(#izBlurTight)"
+              d="M377.5 113A26.5 37.5 0 1 0 430.5 113A26.5 37.5 0 1 0 377.5 113ZM386.5 113A17.5 28.5 0 1 0 421.5 113A17.5 28.5 0 1 0 386.5 113Z"/>
+        <path fill-rule="evenodd" fill="url(#izGlow)" opacity=".52" filter="url(#izBlurEdge)"
+              d="M377.5 113A26.5 37.5 0 1 0 430.5 113A26.5 37.5 0 1 0 377.5 113ZM386.5 113A17.5 28.5 0 1 0 421.5 113A17.5 28.5 0 1 0 386.5 113Z"/>
+      </g>
+
+      <!-- The blurred aura copies spread INWARD as well as outward and were
+           flooding the counter of the "0", which killed both the ring read and
+           the centre dot. Knock the counter back to face tone; the outward
+           emission into the face is untouched. -->
+      <ellipse cx="404" cy="113" rx="18.5" ry="29.5" fill="url(#izFace)" opacity=".82"/>
+      <ellipse cx="404" cy="113" rx="18.5" ry="29.5" fill="#000" opacity=".30"/>
+
+      <!-- groove between face and rim, then the rim itself -->
+      <circle cx="404" cy="113" r="63.9" fill="none" stroke="#000000" stroke-opacity=".7" stroke-width="1.4"/>
+      <circle cx="404" cy="113" r="65.4" fill="none" stroke="url(#izRim)" stroke-width="2"/>
+      <path d="M468.41 124.36A65.4 65.4 0 0 1 426.37 174.46" fill="none"
+            stroke="url(#izRimBR)" stroke-width="2" stroke-linecap="round"/>
+
+      <!-- ══ the "0" ══ -->
+      <g clip-path="url(#izZeroClip)">
+        <path fill-rule="evenodd" fill="url(#izChrome)"
+              d="M377.5 113A26.5 37.5 0 1 0 430.5 113A26.5 37.5 0 1 0 377.5 113ZM386.5 113A17.5 28.5 0 1 0 421.5 113A17.5 28.5 0 1 0 386.5 113Z"/>
+        <g filter="url(#izBlurEdge)">
+          <!-- bright outer edge: only the inner half of this stroke survives the clip -->
+          <ellipse cx="404" cy="113" rx="26.5" ry="37.5" fill="none"
+                   stroke="url(#izBevelOut)" stroke-width="7"/>
+          <!-- darker inner edge, lit from the left -->
+          <ellipse cx="404" cy="113" rx="17.5" ry="28.5" fill="none"
+                   stroke="url(#izBevelIn)" stroke-width="5.6"/>
+          <!-- second highlight, bottom-right -->
+          <path d="M428.9 125.83A26.5 37.5 0 0 1 412.19 148.66" fill="none"
+                stroke="url(#izSpecBR)" stroke-width="5" stroke-linecap="round"/>
+        </g>
+      </g>
+      <!-- dark contour straddling both boundaries: the measured hairline that
+           separates the chrome from the face and from the hole -->
+      <path fill="none" stroke="#000000" stroke-opacity=".9" stroke-width="2"
+            d="M377.5 113A26.5 37.5 0 1 0 430.5 113A26.5 37.5 0 1 0 377.5 113ZM386.5 113A17.5 28.5 0 1 0 421.5 113A17.5 28.5 0 1 0 386.5 113Z"/>
+
+      <!-- small soft dot dead centre, with its own bloom -->
+      <circle cx="404" cy="113" r="4.6" fill="#eaf1f6" opacity=".55" filter="url(#izBlurTight)"/>
+      <circle cx="404" cy="113" r="6.0" fill="url(#izDot)"/>
+
+      <!-- ══ escape glow ══ the only layer allowed past the bezel: a wide, very
+           soft copy of the ring drawn over everything, so the badge reads as
+           actually emitting light onto the envelope. -->
+      <path fill-rule="evenodd" fill="url(#izGlow)" opacity=".24" filter="url(#izBlurEscape)"
+            d="M377.5 113A26.5 37.5 0 1 0 430.5 113A26.5 37.5 0 1 0 377.5 113ZM386.5 113A17.5 28.5 0 1 0 421.5 113A17.5 28.5 0 1 0 386.5 113Z"/>
+    </g>
   </svg>
 
   <form class="bar" id="bar" novalidate>
-    <input id="email" type="email" name="email" placeholder="Enter your email" autocomplete="email" required aria-label="Enter your email">
-    <button type="submit">Join waitlist</button>
+    <input class="bar-field" id="email" type="email" name="email" placeholder="Enter your email"
+           autocomplete="email" inputmode="email" spellcheck="false" required aria-label="Enter your email">
+    <button class="bar-cta" id="cta" type="submit">Join waitlist</button>
+    <!-- FormSubmit honeypot: bots fill it in, people never see it. -->
+    <input class="bar-honey" type="text" name="_honey" tabindex="-1" autocomplete="off" aria-hidden="true">
+    <span class="bar-msg" id="msg" role="status" aria-live="polite"></span>
   </form>
 
 </main>
 
 <script>
-  const bar = document.getElementById('bar');
-  const email = document.getElementById('email');
+(function () {
+  'use strict';
 
-  bar.addEventListener('submit', (e) => {
+  /* ─── THE ONE LINE TO EDIT ───────────────────────────────────────────────
+     Put the address that should receive the signups here, and nowhere else.
+
+     ⚠  THIS REPO IS PUBLIC (GitHub Pages on a free plan requires it), so
+        whatever you write here is readable by anyone — and by address
+        harvesters. Two ways to handle that:
+
+        a) Quick: put your real address here. Submit the form once yourself;
+           FormSubmit emails you an activation link — click it, and from then on
+           signups arrive in your inbox. Your address is public in the source.
+
+        b) Better: do (a) once from a local copy, and in the activation email
+           FormSubmit gives you a random ALIAS that looks like
+           'a1b2c3d4e5f6...'. Put THAT alias here instead of your address. It
+           routes to the same inbox and reveals nothing.
+
+     Until an address is activated the API still answers "success" but no mail
+     is delivered. No account and no API key are involved.
+
+     formsubmit.co rejects a "null" origin, so test over http(s) — any local
+     server will do — not by double-clicking the file open. */
+  var FORMSUBMIT_TARGET = 'PUT-YOUR-EMAIL-OR-FORMSUBMIT-ALIAS-HERE';
+
+  var SUBJECT    = 'Inbox Zero — new waitlist signup';
+  var ENDPOINT   = 'https://formsubmit.co/ajax/' + encodeURIComponent(FORMSUBMIT_TARGET);
+  var EMAIL_RE   = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+  var TIMEOUT_MS = 12000;
+  var ERROR_HOLD = 4200;
+
+  var bar   = document.getElementById('bar');
+  var field = document.getElementById('email');
+  var cta   = document.getElementById('cta');
+  var msg   = document.getElementById('msg');
+  var honey = bar.elements['_honey'];
+
+  var busy = false;      // a request is in flight
+  var done = false;      // this visitor is on the list; the form is spent
+  var holdTimer = 0;
+
+  function shake() {
+    bar.classList.remove('is-shake');
+    void bar.offsetWidth;                    // restart the animation
+    bar.classList.add('is-shake');
+  }
+
+  function say(text, ok) {
+    clearTimeout(holdTimer);
+    msg.textContent = text;
+    bar.classList.toggle('is-ok', !!ok);
+    bar.classList.add('is-msg');
+  }
+
+  function hush() {
+    clearTimeout(holdTimer);
+    bar.classList.remove('is-msg', 'is-ok');
+    msg.textContent = '';
+  }
+
+  function lock(on) {
+    cta.disabled   = on;
+    field.readOnly = on;
+  }
+
+  function succeed() {
+    busy = false;
+    done = true;
+    lock(true);
+    field.blur();
+    say('You\u2019re on the list.', true);
+  }
+
+  function fail() {
+    busy = false;
+    lock(false);
+    say('Could not send. Try again.', false);
+    holdTimer = setTimeout(hush, ERROR_HOLD);
+  }
+
+  bar.addEventListener('submit', function (e) {
     e.preventDefault();
-    const v = email.value.trim();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v)) {
-      email.focus();
-      bar.animate(
-        [{transform:'translateX(0)'},{transform:'translateX(-6px)'},{transform:'translateX(6px)'},{transform:'translateX(0)'}],
-        {duration:260, easing:'ease-in-out'}
-      );
+    if (busy || done) return;                          // no double submits
+
+    var value = field.value.trim();
+    if (!EMAIL_RE.test(value)) {
+      hush();
+      field.focus();
+      shake();
       return;
     }
-    bar.classList.add('is-done');
-    bar.innerHTML = '<span class="done">You’re on the list.</span>';
+
+    // Honeypot tripped, so this is a bot. Behave exactly as if it worked,
+    // and send nothing.
+    if (honey && honey.value) { succeed(); return; }
+
+    busy = true;
+    lock(true);
+    say('Sending\u2026', false);
+
+    var ctrl  = ('AbortController' in window) ? new AbortController() : null;
+    var timer = setTimeout(function () { if (ctrl) ctrl.abort(); }, TIMEOUT_MS);
+
+    var opts = {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({
+        email:     value,
+        _subject:  SUBJECT,
+        _captcha:  false,        // FormSubmit's own flag: skip its captcha page
+        _template: 'table'
+      })
+    };
+    if (ctrl) opts.signal = ctrl.signal;
+
+    fetch(ENDPOINT, opts)
+      .then(function (res) {
+        return res.json()
+          .catch(function () { return null; })
+          .then(function (data) {
+            if (!res.ok || !data || String(data.success) !== 'true') throw new Error('rejected');
+          });
+      })
+      .then(succeed)
+      .catch(fail)
+      .then(function () { clearTimeout(timer); });
   });
+
+  // Typing again after a failure clears the message and hands the bar back.
+  field.addEventListener('input', function () {
+    if (!busy && !done) hush();
+  });
+})();
 </script>
 
 </body>
